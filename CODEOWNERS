@@ -1,5 +1,12 @@
 # NLOS Documentation Site
-* @nlos-labs/docs-team @nlos-labs/frontend-team
+* @nlos-labs/docs-team
 
-# Content
-/content/ @nlos-labs/docs-team
+# API Documentation
+/docs/api/ @nlos-labs/backend-team @nlos-labs/docs-team
+
+# User Guides
+/docs/guides/ @nlos-labs/docs-team
+
+# Developer Documentation
+/docs/developers/ @nlos-labs/core-team @nlos-labs/docs-team
+
