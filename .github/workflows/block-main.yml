@@ -1,0 +1,129 @@
+name: Block Direct Pushes to Main
+
+# This workflow provides branch protection for private repos without GitHub Pro
+# It fails if commits are pushed directly to main without going through a PR
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  check-pr-merge:
+    name: Verify PR Merge
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Check if commit is from merged PR
+        id: check_pr
+        run: |
+          # Get the commit SHA
+          COMMIT_SHA="${{ github.sha }}"
+          
+          # Check if this is a merge commit (has 2 parents)
+          PARENT_COUNT=$(git rev-list --parents -n 1 "$COMMIT_SHA" | wc -w)
+          PARENT_COUNT=$((PARENT_COUNT - 1))
+          
+          echo "Parent count: $PARENT_COUNT"
+          
+          # Check commit message for PR merge pattern
+          COMMIT_MSG=$(git log -1 --pretty=%B "$COMMIT_SHA")
+          echo "Commit message: $COMMIT_MSG"
+          
+          # Allow if this is a merge commit with PR pattern
+          if [[ $PARENT_COUNT -eq 2 ]] && [[ "$COMMIT_MSG" =~ ^Merge\ pull\ request ]]; then
+            echo "✅ Commit is from a merged PR"
+            echo "is_pr_merge=true" >> $GITHUB_OUTPUT
+            exit 0
+          fi
+          
+          # Allow initial commit or first setup commits
+          COMMIT_COUNT=$(git rev-list --count HEAD)
+          if [[ $COMMIT_COUNT -le 3 ]]; then
+            echo "⚠️ Initial repository setup - allowing commit"
+            echo "is_pr_merge=true" >> $GITHUB_OUTPUT
+            exit 0
+          fi
+          
+          # Check if commit was made by GitHub Actions (CI/CD automation)
+          AUTHOR_EMAIL=$(git log -1 --pretty=format:'%ae' "$COMMIT_SHA")
+          if [[ "$AUTHOR_EMAIL" =~ github-actions\[bot\] ]]; then
+            echo "⚠️ Commit from GitHub Actions - allowing"
+            echo "is_pr_merge=true" >> $GITHUB_OUTPUT
+            exit 0
+          fi
+          
+          # Check via GitHub API for associated PR
+          echo "Checking GitHub API for associated PR..."
+          PR_NUMBER=$(gh api repos/${{ github.repository }}/commits/$COMMIT_SHA/pulls \
+            --jq '.[0].number' 2>/dev/null || echo "")
+          
+          if [[ -n "$PR_NUMBER" ]]; then
+            echo "✅ Commit is associated with PR #$PR_NUMBER"
+            echo "is_pr_merge=true" >> $GITHUB_OUTPUT
+            exit 0
+          fi
+          
+          # If we get here, this is a direct push
+          echo "❌ Direct push to main detected!"
+          echo "is_pr_merge=false" >> $GITHUB_OUTPUT
+        env:
+          GH_TOKEN: ${{ github.token }}
+
+      - name: Block direct push
+        if: steps.check_pr.outputs.is_pr_merge == 'false'
+        run: |
+          echo "::error::Direct pushes to main branch are not allowed!"
+          echo ""
+          echo "This repository requires all changes to go through Pull Requests."
+          echo ""
+          echo "To fix this:"
+          echo "1. Revert the commit: git revert HEAD"
+          echo "2. Push the revert: git push origin main"
+          echo "3. Create a branch: git checkout -b feature/my-changes"
+          echo "4. Cherry-pick your changes: git cherry-pick <commit-sha>"
+          echo "5. Push branch: git push origin feature/my-changes"
+          echo "6. Create a Pull Request on GitHub"
+          echo ""
+          echo "Or to undo locally:"
+          echo "1. Reset to previous commit: git reset --hard HEAD~1"
+          echo "2. Force push: git push origin main --force"
+          echo "3. Create a branch and PR with your changes"
+          exit 1
+
+      - name: Verify CI checks ran
+        if: steps.check_pr.outputs.is_pr_merge == 'true'
+        run: |
+          COMMIT_SHA="${{ github.sha }}"
+          
+          # For merge commits, check the head commit of the merged PR
+          if git rev-list --parents -n 1 "$COMMIT_SHA" | wc -w | grep -q "3"; then
+            # Get the second parent (the PR branch head)
+            PR_HEAD=$(git rev-list --parents -n 1 "$COMMIT_SHA" | awk '{print $3}')
+            if [[ -n "$PR_HEAD" ]]; then
+              COMMIT_SHA="$PR_HEAD"
+              echo "Checking CI status for PR head commit: $PR_HEAD"
+            fi
+          fi
+          
+          # Check if CI checks exist for this commit
+          echo "Checking CI status for commit: $COMMIT_SHA"
+          
+          # Get check runs for this commit
+          CHECK_RUNS=$(gh api repos/${{ github.repository }}/commits/$COMMIT_SHA/check-runs \
+            --jq '.check_runs[] | select(.name != "Verify PR Merge") | .name' 2>/dev/null || echo "")
+          
+          if [[ -z "$CHECK_RUNS" ]]; then
+            echo "⚠️ Warning: No CI checks found for this commit"
+            echo "This might be an initial setup or the PR was merged before CI completed"
+            # Don't fail for now to allow repository setup
+          else
+            echo "✅ CI checks found:"
+            echo "$CHECK_RUNS"
+          fi
+        env:
+          GH_TOKEN: ${{ github.token }}

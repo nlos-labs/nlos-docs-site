@@ -1,0 +1,202 @@
+name: PR Gate - CODEOWNERS Check
+
+# This workflow validates that PRs have appropriate CODEOWNERS approval
+# Acts as a required status check for PR merging
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review, review_requested]
+  pull_request_review:
+    types: [submitted, dismissed]
+
+jobs:
+  check-codeowners-approval:
+    name: Verify CODEOWNERS Approval
+    runs-on: ubuntu-latest
+    # Don't run on draft PRs
+    if: github.event.pull_request.draft == false
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Get changed files
+        id: changed_files
+        run: |
+          # Get list of changed files in the PR
+          gh pr view ${{ github.event.pull_request.number }} \
+            --json files --jq '.files[].path' > changed_files.txt
+          
+          echo "Changed files:"
+          cat changed_files.txt
+          
+          # Count files
+          FILE_COUNT=$(wc -l < changed_files.txt)
+          echo "file_count=$FILE_COUNT" >> $GITHUB_OUTPUT
+        env:
+          GH_TOKEN: ${{ github.token }}
+
+      - name: Determine required reviewers from CODEOWNERS
+        id: required_reviewers
+        run: |
+          if [[ ! -f .github/CODEOWNERS ]]; then
+            echo "⚠️ No CODEOWNERS file found"
+            echo "has_codeowners=false" >> $GITHUB_OUTPUT
+            exit 0
+          fi
+          
+          echo "has_codeowners=true" >> $GITHUB_OUTPUT
+          
+          # Parse CODEOWNERS to find required teams/users for changed files
+          REQUIRED_TEAMS=""
+          
+          while IFS= read -r file; do
+            echo "Checking ownership for: $file"
+            
+            # Read CODEOWNERS and find matching patterns
+            while IFS= read -r line; do
+              # Skip comments and empty lines
+              [[ "$line" =~ ^#.*$ ]] && continue
+              [[ -z "$line" ]] && continue
+              
+              # Extract pattern and owners
+              PATTERN=$(echo "$line" | awk '{print $1}')
+              OWNERS=$(echo "$line" | awk '{$1=""; print $0}' | xargs)
+              
+              # Simple pattern matching (this is a simplified version)
+              # Convert CODEOWNERS pattern to something we can match
+              PATTERN_REGEX=$(echo "$PATTERN" | sed 's/\*/.*/' | sed 's/\?/./')
+              
+              if [[ "$file" =~ $PATTERN_REGEX ]] || [[ "$PATTERN" == "*" ]]; then
+                echo "  Matched pattern: $PATTERN -> $OWNERS"
+                REQUIRED_TEAMS="$REQUIRED_TEAMS $OWNERS"
+              fi
+            done < .github/CODEOWNERS
+          done < changed_files.txt
+          
+          # Remove duplicates and save
+          REQUIRED_TEAMS=$(echo "$REQUIRED_TEAMS" | tr ' ' '\n' | sort -u | tr '\n' ' ')
+          echo "Required teams/users: $REQUIRED_TEAMS"
+          echo "required_teams=$REQUIRED_TEAMS" >> $GITHUB_OUTPUT
+          
+          # Count required teams
+          TEAM_COUNT=$(echo "$REQUIRED_TEAMS" | wc -w)
+          echo "required_team_count=$TEAM_COUNT" >> $GITHUB_OUTPUT
+
+      - name: Get PR reviews
+        id: pr_reviews
+        run: |
+          # Get all reviews for this PR
+          gh pr view ${{ github.event.pull_request.number }} \
+            --json reviews --jq '.reviews[] | select(.state == "APPROVED") | .author.login' \
+            > approved_reviewers.txt
+          
+          echo "Approved reviewers:"
+          cat approved_reviewers.txt || echo "None"
+          
+          APPROVAL_COUNT=$(wc -l < approved_reviewers.txt 2>/dev/null || echo "0")
+          echo "approval_count=$APPROVAL_COUNT" >> $GITHUB_OUTPUT
+        env:
+          GH_TOKEN: ${{ github.token }}
+
+      - name: Check if PR author is reviewer (not allowed)
+        id: check_author
+        run: |
+          PR_AUTHOR="${{ github.event.pull_request.user.login }}"
+          echo "PR Author: $PR_AUTHOR"
+          
+          if grep -q "^$PR_AUTHOR$" approved_reviewers.txt 2>/dev/null; then
+            echo "⚠️ Warning: PR author approved their own PR"
+            echo "author_approved_own=true" >> $GITHUB_OUTPUT
+          else
+            echo "author_approved_own=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Validate CODEOWNERS approval
+        run: |
+          HAS_CODEOWNERS="${{ steps.required_reviewers.outputs.has_codeowners }}"
+          REQUIRED_TEAMS="${{ steps.required_reviewers.outputs.required_teams }}"
+          APPROVAL_COUNT="${{ steps.pr_reviews.outputs.approval_count }}"
+          AUTHOR_APPROVED_OWN="${{ steps.check_author.outputs.author_approved_own }}"
+          
+          echo "=== CODEOWNERS Approval Check ==="
+          echo ""
+          
+          if [[ "$HAS_CODEOWNERS" != "true" ]]; then
+            echo "⚠️ No CODEOWNERS file found - skipping validation"
+            echo "Consider adding a CODEOWNERS file to enforce code ownership"
+            exit 0
+          fi
+          
+          echo "Required reviewers: $REQUIRED_TEAMS"
+          echo "Approval count: $APPROVAL_COUNT"
+          echo ""
+          
+          # Check minimum approval count (at least 1)
+          if [[ "$APPROVAL_COUNT" -lt 1 ]]; then
+            echo "::error::This PR requires at least 1 approval from a code owner"
+            echo ""
+            echo "Required reviewers based on changed files:"
+            echo "$REQUIRED_TEAMS" | tr ' ' '\n' | sed 's/^/  - /'
+            echo ""
+            echo "Please request review from appropriate team members."
+            exit 1
+          fi
+          
+          # Check if author approved their own PR
+          if [[ "$AUTHOR_APPROVED_OWN" == "true" ]]; then
+            echo "::warning::PR author approved their own PR - this should not count toward requirements"
+          fi
+          
+          # For now, we accept any approval
+          # In production, you'd check if reviewers match required teams
+          # This requires GitHub API team membership checks
+          
+          echo "✅ PR has required approvals"
+          echo ""
+          echo "Note: This is a basic check. In production with GitHub Pro,"
+          echo "use native CODEOWNERS enforcement for stricter validation."
+
+      - name: Check CI status
+        run: |
+          # Verify other CI checks are passing
+          echo "Checking CI status for this PR..."
+          
+          # Get check runs for the PR head commit
+          COMMIT_SHA="${{ github.event.pull_request.head.sha }}"
+          
+          # Get all check runs except this one
+          gh api repos/${{ github.repository }}/commits/$COMMIT_SHA/check-runs \
+            --jq '.check_runs[] | select(.name != "Verify CODEOWNERS Approval") | "\(.name): \(.conclusion // .status)"' \
+            > ci_status.txt || true
+          
+          if [[ -s ci_status.txt ]]; then
+            echo "CI Check Status:"
+            cat ci_status.txt
+            
+            # Check for any failures
+            if grep -q "failure" ci_status.txt; then
+              echo ""
+              echo "::warning::Some CI checks have failed. Fix them before merging."
+            fi
+          else
+            echo "⚠️ No other CI checks found yet"
+          fi
+        env:
+          GH_TOKEN: ${{ github.token }}
+
+      - name: Summary
+        if: always()
+        run: |
+          echo "### CODEOWNERS Approval Status" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "- **Changed Files:** ${{ steps.changed_files.outputs.file_count }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Has CODEOWNERS:** ${{ steps.required_reviewers.outputs.has_codeowners }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Approvals:** ${{ steps.pr_reviews.outputs.approval_count }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          
+          if [[ "${{ steps.required_reviewers.outputs.has_codeowners }}" == "true" ]]; then
+            echo "**Required Reviewers:**" >> $GITHUB_STEP_SUMMARY
+            echo '```' >> $GITHUB_STEP_SUMMARY
+            echo "${{ steps.required_reviewers.outputs.required_teams }}" | tr ' ' '\n' >> $GITHUB_STEP_SUMMARY
+            echo '```' >> $GITHUB_STEP_SUMMARY
+          fi
