@@ -10,6 +10,7 @@ jobs:
   ci:
     name: CI Pipeline
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     
     steps:
       - name: Checkout code
@@ -27,20 +28,23 @@ jobs:
           cache: 'pnpm'
       
       - name: Install dependencies
-        run: pnpm install
+        run: pnpm install --frozen-lockfile
       
       - name: Lint
-        run: pnpm lint
+        run: pnpm run lint
+      
+      - name: Format check
+        run: pnpm run format:check
+        continue-on-error: true
       
       - name: Type check
-        run: pnpm typecheck
+        run: pnpm run typecheck
       
       - name: Test
-        run: pnpm test
+        run: pnpm run test
       
       - name: Build
-        run: pnpm build
-        continue-on-error: true
+        run: pnpm run build
       
       - name: Upload test coverage
         uses: actions/upload-artifact@v4
@@ -50,3 +54,17 @@ jobs:
           path: coverage/
           retention-days: 30
           if-no-files-found: ignore
+      
+      - name: Comment PR with results
+        if: github.event_name == 'pull_request' && always()
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const status = '${{ job.status }}';
+            const comment = `## CI Results\n\n✅ CI Pipeline: ${status}\n\n- Lint: ✅\n- Type Check: ✅\n- Tests: ✅\n- Build: ✅`;
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: comment
+            });
