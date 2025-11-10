@@ -1,12 +1,34 @@
-# NLOS Documentation Site
-* @nlos-labs/docs-team
+# NLOS Docs Site - Documentation Website
+# Default owners for everything in the repo
+* @nlos-labs/docs-team @nlos-labs/frontend-team
 
-# API Documentation
-/docs/api/ @nlos-labs/backend-team @nlos-labs/docs-team
+# Source Code
+/src/ @nlos-labs/frontend-team
+/web/ @nlos-labs/frontend-team
 
-# User Guides
-/docs/guides/ @nlos-labs/docs-team
+# Documentation Content
+/content/ @nlos-labs/docs-team
+/docs/ @nlos-labs/docs-team
+/blog/ @nlos-labs/docs-team @nlos-labs/product-team
+/guides/ @nlos-labs/docs-team
+/tutorials/ @nlos-labs/docs-team
 
-# Developer Documentation
-/docs/developers/ @nlos-labs/core-team @nlos-labs/docs-team
+# Configuration
+/config/ @nlos-labs/devops-team @nlos-labs/docs-team
+.env.example @nlos-labs/devops-team
 
+# Scripts & DevOps
+/scripts/ @nlos-labs/devops-team
+
+# CI/CD
+/.github/workflows/ @nlos-labs/devops-team
+
+# Documentation
+README.md @nlos-labs/docs-team
+
+# Testing
+*.test.ts @nlos-labs/frontend-team @nlos-labs/qa-team
+
+# Configuration Files
+package.json @nlos-labs/frontend-team
+tsconfig.json @nlos-labs/frontend-team
