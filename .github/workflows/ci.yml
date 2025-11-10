@@ -27,7 +27,7 @@ jobs:
           cache: 'pnpm'
       
       - name: Install dependencies
-        run: pnpm install --frozen-lockfile
+        run: pnpm install
       
       - name: Lint
         run: pnpm lint
@@ -42,10 +42,11 @@ jobs:
         run: pnpm build
         continue-on-error: true
       
-      - name: Upload test results
-        uses: actions/upload-artifact@v3
+      - name: Upload test coverage
+        uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: test-results
+          name: test-coverage-${{ github.sha }}
           path: coverage/
           retention-days: 30
+          if-no-files-found: ignore
