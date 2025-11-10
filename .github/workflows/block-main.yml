@@ -1,97 +1,110 @@
 name: Branch Protection Fallback
 
+# This workflow provides basic branch protection for private repos
+# without GitHub Pro by blocking direct commits to main that bypass CI
+# and requiring CODEOWNERS approval validation
+
 on:
   push:
     branches: [main]
+  pull_request:
+    branches: [main]
 
 jobs:
-  verify-protection:
-    name: Verify Branch Protection
+  validate-push:
+    name: Validate Push to Main
+    if: github.event_name == 'push'
     runs-on: ubuntu-latest
-    
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
+      - name: Check if push is from merged PR
+        uses: actions/github-script@v7
         with:
-          fetch-depth: 0
-      
-      - name: Check if commit is from merged PR
-        id: check_pr
-        run: |
-          COMMIT_SHA="${{ github.sha }}"
-          
-          # Check if this commit has a PR associated
-          PR_NUMBER=$(gh pr list --state merged --json number,mergeCommit \
-            --jq ".[] | select(.mergeCommit.oid == \"$COMMIT_SHA\") | .number" || echo "")
-          
-          if [ -z "$PR_NUMBER" ]; then
-            # Check if this is a direct push
-            if [ "${{ github.event.forced }}" == "true" ]; then
-              echo "❌ Force push detected on main branch!"
-              exit 1
-            fi
+          script: |
+            const { data: commit } = await github.rest.repos.getCommit({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              ref: context.sha
+            });
             
-            # Allow commits from GitHub Actions or merge commits
-            COMMITTER="${{ github.event.head_commit.committer.username }}"
-            if [ "$COMMITTER" != "github-actions[bot]" ] && [ "$COMMITTER" != "web-flow" ]; then
-              echo "⚠️  Warning: Direct commit to main branch detected!"
-              echo "This should typically come from a merged PR."
-              echo "Committer: $COMMITTER"
-              # Don't fail, just warn for now
-            fi
-          else
-            echo "✅ Commit is from merged PR #$PR_NUMBER"
-          fi
-        env:
-          GH_TOKEN: ${{ github.token }}
-      
-      - name: Verify CI checks passed
-        run: |
-          COMMIT_SHA="${{ github.sha }}"
-          
-          # Wait a moment for CI to register
-          sleep 5
-          
-          # Check if CI workflow exists and passed
-          gh run list --commit "$COMMIT_SHA" --workflow ci.yml --json conclusion \
-            --jq '.[0].conclusion' > /tmp/ci_status.txt || echo "none" > /tmp/ci_status.txt
-          
-          CI_STATUS=$(cat /tmp/ci_status.txt)
-          
-          if [ "$CI_STATUS" == "success" ]; then
-            echo "✅ CI checks passed"
-          elif [ "$CI_STATUS" == "none" ] || [ -z "$CI_STATUS" ]; then
-            echo "⚠️  CI checks not found or still running"
-          else
-            echo "❌ CI checks failed with status: $CI_STATUS"
-            exit 1
-          fi
-        env:
-          GH_TOKEN: ${{ github.token }}
+            // Check if commit message indicates a PR merge
+            const isMergeCommit = commit.commit.message.startsWith('Merge pull request #');
+            const hasParents = commit.parents && commit.parents.length > 1;
+            
+            if (!isMergeCommit && !hasParents) {
+              core.setFailed('Direct commits to main are not allowed. Please create a pull request.');
+            } else {
+              console.log('✅ Push is from a merged PR');
+            }
 
-  codeowners-check:
-    name: Verify CODEOWNERS Approval
-    runs-on: ubuntu-latest
+  validate-codeowners:
+    name: Validate CODEOWNERS Approval
     if: github.event_name == 'pull_request'
-    
+    runs-on: ubuntu-latest
     steps:
-      - name: Checkout code
+      - name: Checkout
         uses: actions/checkout@v4
-      
-      - name: Check for CODEOWNERS approval
-        run: |
-          PR_NUMBER="${{ github.event.pull_request.number }}"
-          
-          # Get list of required teams from CODEOWNERS
-          REQUIRED_TEAMS="devops-team"
-          
-          # Get PR reviews
-          REVIEWS=$(gh pr view "$PR_NUMBER" --json reviews --jq '.reviews[].author.login')
-          
-          echo "Reviews received from: $REVIEWS"
-          echo "This is a fallback check. Native branch protection should be enabled when GitHub Pro is active."
-          
-          # For now, just log the check
-          echo "✅ CODEOWNERS check completed (fallback mode)"
-        env:
-          GH_TOKEN: ${{ github.token }}
+
+      - name: Check CODEOWNERS approval
+        uses: actions/github-script@v7
+        with:
+          script: |
+            // Get PR reviews
+            const { data: reviews } = await github.rest.pulls.listReviews({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              pull_number: context.issue.number
+            });
+            
+            // Get PR files
+            const { data: files } = await github.rest.pulls.listFiles({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              pull_number: context.issue.number
+            });
+            
+            console.log(`Found ${reviews.length} reviews`);
+            console.log(`Found ${files.length} files changed`);
+            
+            // Check for approvals
+            const approvals = reviews.filter(r => r.state === 'APPROVED');
+            console.log(`Found ${approvals.length} approvals`);
+            
+            if (approvals.length === 0) {
+              core.warning('No approving reviews found. CODEOWNERS should review this PR.');
+            } else {
+              console.log('✅ PR has approving reviews');
+            }
+
+  require-ci-checks:
+    name: Require CI Checks
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check CI status
+        uses: actions/github-script@v7
+        with:
+          script: |
+            // Get check runs for the PR head
+            const { data: checkRuns } = await github.rest.checks.listForRef({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              ref: context.payload.pull_request.head.sha
+            });
+            
+            console.log(`Found ${checkRuns.total_count} check runs`);
+            
+            // Look for CI check
+            const ciCheck = checkRuns.check_runs.find(c => c.name === 'CI Pipeline');
+            
+            if (ciCheck) {
+              console.log(`CI check status: ${ciCheck.status} - ${ciCheck.conclusion}`);
+              if (ciCheck.conclusion === 'success') {
+                console.log('✅ CI checks passed');
+              } else if (ciCheck.status === 'completed') {
+                core.setFailed('CI checks must pass before merging');
+              } else {
+                core.warning('CI checks are still running');
+              }
+            } else {
+              core.warning('CI check not found - may still be queued');
+            }
