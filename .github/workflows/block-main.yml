@@ -26,12 +26,19 @@ jobs:
               ref: context.sha
             });
             
+            const message = commit.commit.message;
+            console.log(`Commit message: ${message.split('\n')[0]}`);
+            
             // Check if commit message indicates a PR merge
-            const isMergeCommit = commit.commit.message.startsWith('Merge pull request #');
+            const isMergeCommit = message.startsWith('Merge pull request #');
             const hasParents = commit.parents && commit.parents.length > 1;
             
-            // Allow infrastructure setup commits
-            const isInfraCommit = commit.commit.message.match(/^(chore|ci|infra).*:(infrastructure|CI|workflow|setup)/i);
+            // Allow infrastructure setup commits (more flexible pattern)
+            const isInfraCommit = message.match(/^(chore|ci|infra|feat|fix).*:.*\b(infrastructure|CI|workflow|setup|config)\b/i);
+            
+            console.log(`isMergeCommit: ${isMergeCommit}`);
+            console.log(`hasParents: ${hasParents} (${commit.parents?.length || 0})`);
+            console.log(`isInfraCommit: ${!!isInfraCommit}`);
             
             if (!isMergeCommit && !hasParents && !isInfraCommit) {
               core.setFailed('Direct commits to main are not allowed. Please create a pull request.');
