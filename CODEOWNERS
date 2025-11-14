@@ -1,0 +1,9 @@
+# Global owners for this repo
+*                       @nlos-labs/core-team
+
+# Workflows and infra
+.github/                @nlos-labs/maintainers
+.github/workflows/      @nlos-labs/maintainers
+
+# Fallback
+*                       @nlos-labs/admin
