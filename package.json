@@ -1,18 +1,18 @@
 {
-  "name": "@nlos/nlos-docs-site",
+  "name": "@nlos/docs-site",
   "version": "0.1.0",
-  "description": "NLOS Docs Site - Core business logic and shared utilities",
+  "description": "NLOS Documentation Portal - Public docs, API reference, guides",
   "type": "module",
   "scripts": {
-    "lint": "eslint . --ext .ts,.tsx",
-    "lint:fix": "eslint . --ext .ts,.tsx --fix",
-    "format": "prettier --write \"src/**/*.{ts,tsx,json,md}\"",
-    "format:check": "prettier --check \"src/**/*.{ts,tsx,json,md}\"",
-    "typecheck": "tsc --noEmit",
-    "test": "vitest run",
-    "test:watch": "vitest",
-    "test:coverage": "vitest run --coverage",
-    "build": "tsc && vite build"
+    "dev": "vitepress dev docs",
+    "build": "vitepress build docs",
+    "preview": "vitepress preview docs",
+    "lint": "eslint . --ext .ts,.tsx,.vue",
+    "lint:fix": "eslint . --ext .ts,.tsx,.vue --fix",
+    "format": "prettier --write \"**/*.{ts,tsx,vue,md,json}\"",
+    "format:check": "prettier --check \"**/*.{ts,tsx,vue,md,json}\"",
+    "typecheck": "vue-tsc --noEmit",
+    "test": "echo \"No tests yet\""
   },
   "keywords": [
     "nlos",
@@ -27,9 +27,19 @@
     "eslint": "^8.54.0",
     "eslint-config-prettier": "^9.0.0",
     "eslint-plugin-prettier": "^5.0.0",
+    "eslint-plugin-vue": "^10.5.1",
     "prettier": "^3.1.0",
     "typescript": "^5.3.0",
     "vite": "^5.0.0",
-    "vitest": "^1.0.0"
+    "vitepress": "^1.6.4",
+    "vitest": "^1.0.0",
+    "vue": "^3.5.24",
+    "vue-tsc": "^3.1.3"
+  },
+  "dependencies": {
+    "@types/react": "^19.2.4",
+    "@types/react-dom": "^19.2.3",
+    "react": "^19.2.0",
+    "react-dom": "^19.2.0"
   }
 }
