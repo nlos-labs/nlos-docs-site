@@ -1,0 +1,62 @@
+name: Documentation
+description: Documentation improvement or request
+title: "[Docs]: "
+labels: ["type:docs", "status:ready", "priority:P2"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Help us improve our documentation!
+  
+  - type: textarea
+    id: summary
+    attributes:
+      label: Summary
+      description: Brief description of documentation need
+      placeholder: What documentation is needed?
+    validations:
+      required: true
+  
+  - type: textarea
+    id: description
+    attributes:
+      label: Detailed Description
+      description: Complete description
+      placeholder: Explain what needs to be documented
+    validations:
+      required: true
+  
+  - type: dropdown
+    id: doc_type
+    attributes:
+      label: Documentation Type
+      description: What kind of documentation?
+      options:
+        - API Documentation
+        - User Guide
+        - Developer Guide
+        - Tutorial
+        - Architecture
+        - Reference
+        - Other
+    validations:
+      required: true
+  
+  - type: textarea
+    id: location
+    attributes:
+      label: Location
+      description: Where should this documentation be added/updated?
+      placeholder: File path or section
+  
+  - type: textarea
+    id: content
+    attributes:
+      label: Suggested Content
+      description: Draft content or outline (if applicable)
+  
+  - type: textarea
+    id: additional
+    attributes:
+      label: Additional Context
+      description: Links, examples, or other relevant information

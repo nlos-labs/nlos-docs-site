@@ -1,93 +1,11 @@
-# CODEOWNERS
-# Lines starting with '#' are comments.
-# Each line is a file pattern followed by one or more owners.
-# Owners are specified by username, email address, or GitHub team name.
-# Order matters; the last matching pattern takes precedence.
-
 # Default owners for everything in the repo
-* @nlos-labs/devops-team
+* @nlos-labs/core-team
 
-# ============================================================================
-# Source Code
-# ============================================================================
-/src/ @nlos-labs/backend-team
-/api/ @nlos-labs/backend-team
-/web/ @nlos-labs/frontend-team
-/components/ @nlos-labs/frontend-team
-/pages/ @nlos-labs/frontend-team
-/app/ @nlos-labs/frontend-team
+# Infrastructure and GitHub config
+/.github/ @nlos-labs/maintainers
+/workflows/ @nlos-labs/maintainers
+/devops/ @nlos-labs/maintainers
+/infra/ @nlos-labs/maintainers
 
-# ============================================================================
-# Database & Infrastructure
-# ============================================================================
-/supabase/ @nlos-labs/database-team @nlos-labs/backend-team
-/supabase/migrations/ @nlos-labs/database-team @nlos-labs/security-team
-/db/ @nlos-labs/database-team
-/prisma/ @nlos-labs/database-team
-/migrations/ @nlos-labs/database-team
-
-# ============================================================================
-# Configuration
-# ============================================================================
-/config/ @nlos-labs/devops-team @nlos-labs/backend-team
-.env.example @nlos-labs/devops-team
-.env.example.* @nlos-labs/devops-team
-*.config.js @nlos-labs/devops-team
-*.config.ts @nlos-labs/devops-team
-
-# ============================================================================
-# Scripts & DevOps
-# ============================================================================
-/scripts/ @nlos-labs/devops-team
-/scripts/supabase_dev.sh @nlos-labs/devops-team @nlos-labs/database-team
-*.sh @nlos-labs/devops-team
-
-# ============================================================================
-# CI/CD & GitHub
-# ============================================================================
-/.github/workflows/ @nlos-labs/devops-team
-/.github/actions/ @nlos-labs/devops-team
-/.github/CODEOWNERS @nlos-labs/devops-team
-
-# ============================================================================
-# Documentation
-# ============================================================================
-/docs/ @nlos-labs/docs-team
-/documentation/ @nlos-labs/docs-team
-*.md @nlos-labs/docs-team
-README.md @nlos-labs/docs-team
-QUICKSTART.md @nlos-labs/docs-team
-CONTRIBUTING.md @nlos-labs/devops-team @nlos-labs/docs-team
-
-# ============================================================================
-# Security & Compliance
-# ============================================================================
-SECURITY.md @nlos-labs/security-team
-/SECURITY.md @nlos-labs/security-team
-/security/ @nlos-labs/security-team
-
-# ============================================================================
-# Testing
-# ============================================================================
-/tests/ @nlos-labs/qa-team
-/test/ @nlos-labs/qa-team
-*.test.ts @nlos-labs/backend-team @nlos-labs/qa-team
-*.test.tsx @nlos-labs/frontend-team @nlos-labs/qa-team
-*.spec.ts @nlos-labs/backend-team @nlos-labs/qa-team
-*.spec.tsx @nlos-labs/frontend-team @nlos-labs/qa-team
-vitest.config.ts @nlos-labs/qa-team
-jest.config.js @nlos-labs/qa-team
-
-# ============================================================================
-# Package Management
-# ============================================================================
-package.json @nlos-labs/devops-team
-package-lock.json @nlos-labs/devops-team
-pnpm-lock.yaml @nlos-labs/devops-team
-yarn.lock @nlos-labs/devops-team
-
-# ============================================================================
-# TypeScript Configuration
-# ============================================================================
-tsconfig.json @nlos-labs/backend-team @nlos-labs/frontend-team
-tsconfig.*.json @nlos-labs/backend-team @nlos-labs/frontend-team
+# Fallback
+* @nlos-labs/admin

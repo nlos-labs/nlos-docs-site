@@ -1,0 +1,51 @@
+name: Task
+description: Create a task or work item
+title: "[Task]: "
+labels: ["type:task", "status:ready", "priority:P2"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Create a task for development, operations, or maintenance work.
+  
+  - type: textarea
+    id: summary
+    attributes:
+      label: Summary
+      description: Brief task description
+      placeholder: What needs to be done?
+    validations:
+      required: true
+  
+  - type: textarea
+    id: description
+    attributes:
+      label: Detailed Description
+      description: Complete description of the task
+      placeholder: Provide full details
+    validations:
+      required: true
+  
+  - type: textarea
+    id: acceptance
+    attributes:
+      label: Acceptance Criteria
+      description: What defines done?
+      placeholder: |
+        - [ ] Criterion 1
+        - [ ] Criterion 2
+        - [ ] Criterion 3
+    validations:
+      required: true
+  
+  - type: textarea
+    id: notes
+    attributes:
+      label: Technical Notes
+      description: Implementation details, dependencies, considerations
+  
+  - type: textarea
+    id: additional
+    attributes:
+      label: Additional Context
+      description: Links, references, or other relevant information
